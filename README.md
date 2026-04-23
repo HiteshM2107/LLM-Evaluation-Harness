@@ -73,7 +73,7 @@ This diagram shows how the RAG pipeline is evaluated in LangSmith using multiple
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/HiteshM2107/LLM-Evaluation-Harness
 cd "LLM Evaluation Harness"
 ```
 
