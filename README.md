@@ -10,6 +10,7 @@ This repository contains two evaluation workflows:
 
 - `chatbot-evaluation-pipline.ipynb`: evaluates a simple chatbot response function against reference answers.
 - `rag-evaluation-pipeline.ipynb`: builds a RAG pipeline over Lilian Weng blog posts and evaluates generated answers plus retrieved context.
+- `rag_strategy_evaluation.py`: compares traditional vector RAG, vectorless hierarchical RAG, and a hybrid retrieval approach in LangSmith.
 
 ## Architecture
 
@@ -24,6 +25,18 @@ The chatbot evaluation flow creates a LangSmith dataset, runs an application ove
 The RAG pipeline loads web documents, splits them into chunks, embeds them into an in-memory vector store, retrieves relevant chunks, and asks an LLM to answer using the retrieved context.
 
 <img src="RAG%20Evaluation%20Architecture.png" alt="RAG evaluation architecture" width="900">
+
+### Vectorless RAG Workflow
+
+The vectorless RAG workflow builds a document hierarchy, scores relevant sections lexically, searches chunks inside the best sections, and preserves source/section provenance for evaluation.
+
+<img src="Vectorless%20RAG%20Workflow.png" alt="Vectorless RAG workflow" width="900">
+
+### Hybrid RAG Workflow
+
+The hybrid RAG workflow combines semantic vector retrieval with hierarchy-based vectorless retrieval, deduplicates candidates, reranks them with an LLM, and answers from the best final context.
+
+<img src="Hybrid%20RAG%20Workflow.png" alt="Hybrid RAG workflow" width="900">
 
 ### RAG Evaluation Flow
 
@@ -59,9 +72,16 @@ This diagram shows how the RAG pipeline is evaluated in LangSmith using multiple
 .
 ├── chatbot-evaluation-pipline.ipynb
 ├── rag-evaluation-pipeline.ipynb
+├── rag_strategy_evaluation.py
 ├── Evaluation Architecture.png
 ├── RAG Evaluation Architecture.png
+├── Vectorless RAG Workflow.png
+├── Hybrid RAG Workflow.png
 ├── LangSmith RAG Evaluation.png
+├── results/
+│   ├── traditional RAG results.png
+│   ├── vectorless RAG results.png
+│   └── hybrid RAG results.png
 ├── requirements.txt
 ├── pyproject.toml
 ├── uv.lock
@@ -149,6 +169,60 @@ This notebook shows how to:
    - Groundedness
    - Retrieval relevance
 8. Convert experiment results to a pandas dataframe.
+
+### RAG Strategy Comparison
+
+`rag_strategy_evaluation.py` evaluates three retrieval strategies against the same mixed dataset and evaluator set:
+
+1. Traditional vector RAG: embeds flat chunks with `OpenAIEmbeddings` and retrieves by vector similarity.
+2. Vectorless hierarchical RAG: builds a document -> section -> chunk hierarchy and retrieves with lexical section/chunk scoring, without embeddings.
+3. Hybrid RAG: combines vector recall with vectorless hierarchical precision, deduplicates candidates, then reranks the merged context before answering.
+
+The source corpus intentionally mixes narrative blog posts with structured internal-style documents, including policy, runbook, release notes, FAQ, and incident-review examples. This makes the comparison less biased toward vector-only semantic retrieval.
+
+Run it with:
+
+```bash
+python rag_strategy_evaluation.py
+```
+
+The script creates or reuses the `RAG Strategy Comparison Mixed Corpus` LangSmith dataset, then runs separate experiments for:
+
+- `traditional-vector-rag`
+- `vectorless-hierarchical-rag`
+- `hybrid-vector-vectorless-rag`
+
+### Dataset Sources
+
+The mixed-corpus strategy comparison uses three public Lilian Weng posts:
+
+- [LLM Powered Autonomous Agents](https://lilianweng.github.io/posts/2023-06-23-agent/)
+- [Prompt Engineering](https://lilianweng.github.io/posts/2023-03-15-prompt-engineering/)
+- [Adversarial Attacks on LLMs](https://lilianweng.github.io/posts/2023-10-25-adv-attack-llm/)
+
+It also includes synthetic internal-style documents defined in `rag_strategy_evaluation.py`:
+
+- `internal://acme-support-policy`: refund rules, escalation tiers, and security exceptions
+- `internal://vectorless-rag-runbook`: hierarchy indexing, retrieval behavior, and vectorless failure modes
+- `internal://product-release-notes`: versioned release notes for retrieval diagnostics, hybrid mode, and reranking
+- `internal://billing-faq`: billable usage, credits, and billing permissions
+- `internal://incident-review-delayed-evals`: delayed evaluation job incident cause, mitigation, and prevention owner
+
+### Example Results
+
+The `results/` folder contains LangSmith screenshots from one mixed-corpus run. In that run, hybrid RAG produced the strongest overall result after reranking, while also showing higher latency and token usage because it performs extra LLM reranking calls.
+
+#### Traditional Vector RAG
+
+<img src="results/traditional%20RAG%20results.png" alt="Traditional vector RAG LangSmith results" width="900">
+
+#### Vectorless Hierarchical RAG
+
+<img src="results/vectorless%20RAG%20results.png" alt="Vectorless hierarchical RAG LangSmith results" width="900">
+
+#### Hybrid Vector + Vectorless RAG
+
+<img src="results/hybrid%20RAG%20results.png" alt="Hybrid vector and vectorless RAG LangSmith results" width="900">
 
 ## Evaluation Metrics
 
